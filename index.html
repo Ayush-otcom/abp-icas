@@ -630,6 +630,39 @@ input[type=range]::-webkit-slider-thumb {
   font-family: 'Share Tech Mono', monospace; font-size: 11px; z-index: 999;
   animation: msgIn 0.2s ease; max-width: 300px; display: none; letter-spacing: 0.5px;
 }
+.toast.success {
+  background: rgba(0,255,136,0.1); border-color: rgba(0,255,136,0.3); color: var(--green);
+}
+
+/* Demo mode toggle */
+.demo-toggle-wrap {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+}
+.demo-toggle-btn {
+  flex: 1; padding: 8px 10px;
+  border-radius: 8px; border: 1px solid rgba(255,215,0,0.35);
+  background: rgba(255,215,0,0.08); color: var(--gold);
+  font-family: 'Share Tech Mono', monospace; font-size: 10px;
+  cursor: pointer; letter-spacing: 1px; transition: all 0.2s; text-align: center;
+}
+.demo-toggle-btn.live {
+  border-color: rgba(0,245,255,0.35); background: rgba(0,245,255,0.08); color: var(--cyan);
+}
+.demo-toggle-btn:hover { filter: brightness(1.3); }
+.demo-status-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  background: var(--gold); box-shadow: 0 0 8px var(--gold); animation: blink 1.5s ease-in-out infinite;
+}
+.demo-status-dot.live { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+.api-key-section { transition: opacity 0.3s; }
+.api-key-section.dimmed { opacity: 0.35; pointer-events: none; }
+
+/* Demo badge in header */
+.hpill.demo-badge {
+  background: rgba(255,215,0,0.12); border-color: rgba(255,215,0,0.4);
+  color: var(--gold); animation: demoPulse 2s ease-in-out infinite;
+}
+@keyframes demoPulse { 0%,100%{box-shadow:0 0 0 rgba(255,215,0,0)} 50%{box-shadow:0 0 10px rgba(255,215,0,0.3)} }
 
 /* scrollbars */
 .chat-messages, .rpanel, .app-sidebar { scrollbar-width: thin; scrollbar-color: var(--dim) transparent; }
@@ -718,9 +751,10 @@ input[type=range]::-webkit-slider-thumb {
       </div>
     </div>
     <div class="header-pills">
-      <span class="hpill">GPT-4o</span>
+      <span class="hpill" id="hModelPill">DEMO MODE</span>
       <span class="hpill">FINANCE DOMAIN</span>
       <span class="hpill gold" id="hBillCount">0 BILLS</span>
+      <span class="hpill demo-badge" id="hDemoBadge">⚡ DEMO</span>
     </div>
     <div class="header-user">
       <div class="user-avatar" id="userAvatar">A</div>
@@ -734,6 +768,14 @@ input[type=range]::-webkit-slider-thumb {
     <!-- LEFT SIDEBAR -->
     <div class="app-sidebar">
       <div class="sb-section">
+        <div class="sb-label">Mode</div>
+        <div class="demo-toggle-wrap">
+          <div class="demo-status-dot" id="modeStatusDot"></div>
+          <button class="demo-toggle-btn" id="modeToggleBtn" onclick="toggleDemoMode()">⚡ DEMO MODE ON</button>
+        </div>
+        <div class="phint" id="modeHint" style="margin-top:0">No API key needed · Simulated AI</div>
+      </div>
+      <div class="sb-section api-key-section dimmed" id="apiKeySection">
         <div class="sb-label">OpenAI API Key</div>
         <div class="api-wrap">
           <input class="api-inp" type="password" id="apiKey" placeholder="sk-..." autocomplete="off"/>
@@ -1125,10 +1167,156 @@ function showToast(msg){
   setTimeout(()=>t.style.display='none',3500);
 }
 
+// ── DEMO MODE STATE ───────────────────────────────
+let demoMode = true;
+
+function toggleDemoMode(){
+  demoMode = !demoMode;
+  const btn   = document.getElementById('modeToggleBtn');
+  const dot   = document.getElementById('modeStatusDot');
+  const hint  = document.getElementById('modeHint');
+  const badge = document.getElementById('hDemoBadge');
+  const pill  = document.getElementById('hModelPill');
+  const apiSec= document.getElementById('apiKeySection');
+  if(demoMode){
+    btn.textContent='⚡ DEMO MODE ON'; btn.classList.remove('live');
+    dot.classList.remove('live');
+    hint.textContent='No API key needed · Simulated AI';
+    badge.style.display='';
+    pill.textContent='DEMO MODE';
+    apiSec.classList.add('dimmed');
+  } else {
+    btn.textContent='🔴 LIVE MODE ON'; btn.classList.add('live');
+    dot.classList.add('live');
+    hint.textContent='Requires OpenAI API key in field below';
+    badge.style.display='none';
+    pill.textContent='GPT-4o';
+    apiSec.classList.remove('dimmed');
+  }
+  const t=document.getElementById('toast');
+  t.className='toast success'; t.textContent= demoMode ? '⚡ Switched to Demo Mode' : '🔴 Switched to Live Mode';
+  t.style.display='block'; setTimeout(()=>{t.style.display='none'; t.className='toast';},2500);
+}
+
+// ── DEMO RESPONSE ENGINE ──────────────────────────
+function demoResponse(msg){
+  const t = msg.toLowerCase();
+
+  // ── BILL PARSE detection
+  const amtM  = msg.match(/[₹Rs\.\s]*(\d[\d,]*(?:\.\d{1,2})?)/);
+  const amt   = amtM ? parseFloat(amtM[1].replace(',','')) : null;
+
+  const dateM = msg.match(/(\d{1,2}[\s-/](?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[\s-/]\d{2,4}|\d{4}-\d{2}-\d{2})/i);
+  let isoDate = null;
+  if(dateM){
+    const d = new Date(dateM[1]); isoDate = isNaN(d)?null:d.toISOString().split('T')[0];
+  }
+
+  const vendors=[
+    {k:['zomato'],v:'Zomato',cat:'Food',item:'Food Delivery'},
+    {k:['swiggy'],v:'Swiggy',cat:'Food',item:'Food Delivery'},
+    {k:['mcdonald','mcdonalds'],v:"McDonald's",cat:'Food',item:'Burger & Fries'},
+    {k:['domino','pizza'],v:"Domino's Pizza",cat:'Food',item:'Pizza'},
+    {k:['apollo','pharmacy','medicine'],v:'Apollo Pharmacy',cat:'Healthcare',item:'Medicines'},
+    {k:['uber'],v:'Uber',cat:'Travel',item:'Cab Ride'},
+    {k:['ola'],v:'Ola Cabs',cat:'Travel',item:'Cab Ride'},
+    {k:['irctc','train'],v:'IRCTC',cat:'Travel',item:'Train Ticket'},
+    {k:['flight','airline','indigo','airindia'],v:'IndiGo Airlines',cat:'Travel',item:'Flight Ticket'},
+    {k:['jio','recharge'],v:'Jio',cat:'Utilities',item:'Mobile Recharge'},
+    {k:['airtel'],v:'Airtel',cat:'Utilities',item:'Mobile Recharge'},
+    {k:['electricity','bescom','msedcl'],v:'Electricity Board',cat:'Utilities',item:'Electricity Bill'},
+    {k:['netflix'],v:'Netflix',cat:'Entertainment',item:'Subscription'},
+    {k:['spotify'],v:'Spotify',cat:'Entertainment',item:'Subscription'},
+    {k:['amazon'],v:'Amazon',cat:'Shopping',item:'Online Purchase'},
+    {k:['flipkart'],v:'Flipkart',cat:'Shopping',item:'Online Purchase'},
+    {k:['restaurant','cafe','dinner','lunch','breakfast'],v:'Restaurant',cat:'Food',item:'Dining'},
+    {k:['grocery','supermarket','dmart','reliance'],v:'D-Mart',cat:'Food',item:'Groceries'},
+    {k:['rent','landlord','lease'],v:'Rent Payment',cat:'Rent',item:'Monthly Rent'},
+  ];
+
+  let vendor=null, cat='Miscellaneous', item='Purchase';
+  for(const vd of vendors){
+    if(vd.k.some(k=>t.includes(k))){ vendor=vd.v; cat=vd.cat; item=vd.item; break; }
+  }
+
+  const isBillParse = amt && (vendor || t.includes('parse') || t.includes('bill') || t.includes('₹') || t.includes('rs'));
+
+  // ── SPLIT detection
+  const isSplit = t.includes('split') || t.includes('divide') || t.includes('share') || t.includes('among');
+  const splitAmtM = msg.match(/[₹Rs\.\s]*(\d[\d,]*(?:\.\d{1,2})?)/);
+  const splitAmt = splitAmtM ? parseFloat(splitAmtM[1].replace(',','')) : null;
+  const numM = msg.match(/(\d+)\s*(?:friend|person|people|member|way|participant)/i);
+  const numPeople = numM ? parseInt(numM[1]) : null;
+  const pctM = [...msg.matchAll(/([A-Z][a-z]+)\s+(\d+)%/g)];
+
+  // ── FINANCE Q&A detection
+  const isFinanceQ = t.includes('budget') || t.includes('sav') || t.includes('reduc') || t.includes('expens') || t.includes('invest') || t.includes('tip') || t.includes('how can') || t.includes('advice');
+
+  // ── OFF DOMAIN
+  const offDomain = (t.includes('joke') || t.includes('weather') || t.includes('sport') || t.includes('movie') || t.includes('recipe') || t.includes('code') || t.includes('poem') || (t.length<60 && !isBillParse && !isSplit && !isFinanceQ));
+
+  /* ── GENERATE RESPONSE ── */
+
+  if(isBillParse && amt){
+    const v = vendor || localCat(msg);
+    const finalCat = cat || localCat(msg);
+    const d = isoDate || new Date().toISOString().split('T')[0];
+    const json = JSON.stringify({
+      vendor: vendor || 'Unknown Vendor',
+      date: d,
+      total_amount: amt,
+      currency: 'INR',
+      items: [{description: item, amount: amt}],
+      category: finalCat
+    }, null, 2);
+    return `\`\`\`json\n${json}\n\`\`\`\n\n**Bill Parsed Successfully ✅**\n\nHere's the breakdown for **${vendor||'this bill'}**:\n\n- **Amount:** ₹${amt.toLocaleString('en-IN',{minimumFractionDigits:2})}\n- **Category:** ${finalCat}\n- **Date:** ${d}\n- **Item:** ${item}\n\nThis expense has been logged under **${finalCat}**. Would you like to split this bill or add another?`;
+  }
+
+  if(isSplit && splitAmt){
+    if(pctM.length>=2){
+      const lines = pctM.map(m=>{
+        const share = (parseFloat(m[2])/100)*splitAmt;
+        return `- **${m[1]}** (${m[2]}%) → **₹${share.toLocaleString('en-IN',{minimumFractionDigits:2})}**`;
+      }).join('\n');
+      const totalPct = pctM.reduce((s,m)=>s+parseFloat(m[2]),0);
+      return `**Cost Split Breakdown ✅**\n\nTotal: ₹${splitAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}\n\n${lines}\n\n${totalPct===100?'✅ Percentages add up to 100%.':'⚠️ Note: Percentages total '+totalPct+'% — please verify.'}`;
+    }
+    if(numPeople){
+      const share = splitAmt/numPeople;
+      const names=['Aman','Priya','Rahul','Sneha','Vikram','Neha','Arjun','Divya'];
+      const lines = Array.from({length:numPeople},(_,i)=>`- **${names[i]||'Person '+(i+1)}** → **₹${share.toLocaleString('en-IN',{minimumFractionDigits:2})}**`).join('\n');
+      return `**Equal Split Breakdown ✅**\n\nTotal: ₹${splitAmt.toLocaleString('en-IN',{minimumFractionDigits:2})} ÷ ${numPeople} people\n\n${lines}\n\nEach person pays **₹${share.toLocaleString('en-IN',{minimumFractionDigits:2})}** equally. 💰`;
+    }
+    return `**Cost Split** 💬\n\nI see a total of ₹${splitAmt.toLocaleString('en-IN',{minimumFractionDigits:2})}. Please specify how many people to split among (e.g., *"split among 4 friends"*) or provide custom percentages (e.g., *"Aman 40%, Priya 60%"*).`;
+  }
+
+  if(isFinanceQ){
+    const tips = [
+      ['food','🍔 **Reduce Food Expenses**\n\n1. **Meal prep** on weekends — saves 40–50% vs ordering daily\n2. **Use Swiggy/Zomato wisely** — order only during discount windows (lunch deals, combo offers)\n3. **Set a weekly food budget** — ₹1,500–₹2,000 is ideal for a single person in metros\n4. **Cook at home 5/7 days** — even simple meals save ₹3,000–₹5,000/month\n5. **Track every food expense** here to spot patterns over time'],
+      ['budget','📊 **Budgeting Tips for Indians**\n\n1. **50/30/20 Rule** — 50% needs (rent, food, bills), 30% wants, 20% savings\n2. **Automate SIPs** — invest ₹500–₹5,000/month in mutual funds on salary day\n3. **Emergency fund first** — save 3–6 months of expenses before investing\n4. **Track monthly** — use this tool to log and categorise every expense\n5. **Review quarterly** — check where you overspent and adjust'],
+      ['sav','💰 **Savings Strategy**\n\n1. **Pay yourself first** — transfer 20% to savings the moment salary arrives\n2. **High-yield savings** — Park emergency funds in liquid mutual funds (5–7% returns)\n3. **Cut subscriptions** — audit Netflix, Spotify, Amazon Prime — cancel unused ones\n4. **Use UPI cashback** — PhonePe, GPay offer ₹50–₹200 cashback on regular transactions\n5. **Annual expenses trap** — divide yearly costs (insurance, renewals) by 12 and save monthly'],
+      ['invest','📈 **Investment Basics**\n\n1. **Start with SIPs** — ₹500/month in index funds beats most savings accounts\n2. **ELSS funds** — save tax under 80C while investing\n3. **PPF** — guaranteed 7.1% returns, 15-year lock-in, tax-free\n4. **Avoid FDs for long term** — inflation often beats FD interest rates\n5. **Diversify** — never put all money in one asset class']
+    ];
+    const tip = tips.find(([k])=>t.includes(k));
+    return tip?tip[1]:'💡 **Finance Tips**\n\n1. Track every expense — even small ones add up\n2. Follow the **50/30/20 rule** for budgeting\n3. Build a **3-month emergency fund** before investing\n4. Automate savings on salary day\n5. Review spending monthly to stay on track\n\nWould you like advice on a specific topic — budgeting, savings, or investments?';
+  }
+
+  if(offDomain && !isBillParse && !isSplit && !isFinanceQ){
+    return `🚫 **Out of Scope**\n\nI'm ABP-ICAS, a domain-restricted financial assistant. I can only help with:\n\n- 📄 **Bill Parsing** — paste any bill\n- 🏷 **Expense Categorisation**\n- ➗ **Cost Splitting**\n- 💬 **Finance Q&A** — budgeting, savings, expenses\n\nPlease ask a finance-related question or paste a bill to get started.`;
+  }
+
+  return `💬 **Finance Assistant**\n\nI can help you with bill parsing, expense tracking, cost splitting, and finance advice. Try:\n\n- *"Parse: Zomato ₹650 on 12 Feb 2025"*\n- *"Split ₹3000 among 3 friends"*\n- *"How can I reduce my food expenses?"*`;
+}
+
 // ── API CALL ──────────────────────────────────────
 async function callAPI(userMsg){
+  // Demo mode — simulate AI response locally
+  if(demoMode){
+    await new Promise(r=>setTimeout(r, 800+Math.random()*700)); // realistic delay
+    return demoResponse(userMsg);
+  }
   const key=document.getElementById('apiKey').value.trim();
-  if(!key) return '⚠️ Enter your OpenAI API key in the sidebar.';
+  if(!key) return '⚠️ No API key found. Either turn on Demo Mode or enter your OpenAI API key in the sidebar.';
   const msgs=[{role:'system',content:SYSTEM}];
   chatHistory.forEach(h=>msgs.push(h));
   msgs.push({role:'user',content:userMsg});
