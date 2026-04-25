@@ -733,9 +733,12 @@ input[type=range]::-webkit-slider-thumb {
     <!-- LEFT SIDEBAR -->
     <div class="app-sidebar">
       <div class="sb-section">
-        <div class="sb-label">Gemini API Key</div>
+        <div class="sb-label" style="display:flex; justify-content:space-between; align-items:center;">
+          Gemini API Key
+          <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--cyan); text-decoration:none; font-size:9px; text-transform:none;">Get Key ↗</a>
+        </div>
         <div class="api-wrap">
-          <input class="api-inp" type="password" id="apiKey" placeholder="sk-..." autocomplete="off"/>
+          <input class="api-inp" type="password" id="apiKey" placeholder="AIza..." autocomplete="off"/>
           <button class="api-eye" onclick="toggleApiKey()" id="apiEye">👁</button>
         </div>
       </div>
