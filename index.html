@@ -670,7 +670,7 @@ input[type=range]::-webkit-slider-thumb {
 
       <div class="status-bar">
         <div class="status-dot"></div>
-        <div class="status-text">SYSTEM ONLINE · GEMINI FLASH READY</div>
+        <div class="status-text">SYSTEM ONLINE · GPT-4o READY</div>
       </div>
 
       <div class="login-field">
@@ -717,7 +717,7 @@ input[type=range]::-webkit-slider-thumb {
       </div>
     </div>
     <div class="header-pills">
-      <span class="hpill">GEMINI FLASH</span>
+      <span class="hpill">GPT-4o</span>
       <span class="hpill">FINANCE DOMAIN</span>
       <span class="hpill gold" id="hBillCount">0 BILLS</span>
     </div>
@@ -733,12 +733,9 @@ input[type=range]::-webkit-slider-thumb {
     <!-- LEFT SIDEBAR -->
     <div class="app-sidebar">
       <div class="sb-section">
-        <div class="sb-label" style="display:flex; justify-content:space-between; align-items:center;">
-          Gemini API Key
-          <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--cyan); text-decoration:none; font-size:9px; text-transform:none;">Get Key ↗</a>
-        </div>
+        <div class="sb-label">OpenAI API Key</div>
         <div class="api-wrap">
-          <input class="api-inp" type="password" id="apiKey" placeholder="AIza..." autocomplete="off"/>
+          <input class="api-inp" type="password" id="apiKey" placeholder="sk-..." autocomplete="off"/>
           <button class="api-eye" onclick="toggleApiKey()" id="apiEye">👁</button>
         </div>
       </div>
@@ -821,8 +818,8 @@ input[type=range]::-webkit-slider-thumb {
         <table class="about-t">
           <tr><td>CHATBOT TYPE</td><td>Generative AI (LLM)</td></tr>
           <tr><td>PLATFORM</td><td>Standalone HTML</td></tr>
-          <tr><td>API</td><td>Google Gemini</td></tr>
-          <tr><td>MODEL</td><td>Gemini 2.5 Flash</td></tr>
+          <tr><td>API</td><td>OpenAI</td></tr>
+          <tr><td>MODEL</td><td>GPT-4o (latest)</td></tr>
           <tr><td>MEMORY</td><td>Session-based</td></tr>
           <tr><td>DOMAIN</td><td>Finance / Expenses</td></tr>
           <tr><td>ROLE</td><td>Domain Expert AI</td></tr>
@@ -833,7 +830,7 @@ input[type=range]::-webkit-slider-thumb {
           <tr><td>TEMPERATURE</td><td>0.20 (low = accurate)</td></tr>
           <tr><td>TOP-P</td><td>0.95 (broad sampling)</td></tr>
           <tr><td>MAX TOKENS</td><td>1024</td></tr>
-          <tr><td>ENDPOINT</td><td>/v1beta/models/gemini-2.5-flash:generateContent</td></tr>
+          <tr><td>ENDPOINT</td><td>/v1/chat/completions</td></tr>
         </table>
         <div class="about-sec">CATEGORIES</div>
         <div style="display:flex;flex-wrap:wrap;gap:4px;">
@@ -1130,32 +1127,20 @@ function showToast(msg){
 // ── API CALL ──────────────────────────────────────
 async function callAPI(userMsg){
   const key=document.getElementById('apiKey').value.trim();
-  if(!key) return '⚠️ Enter your Gemini API key in the sidebar.';
-  
-  const contents = [];
-  history.forEach(h => {
-    contents.push({ role: h.role === 'assistant' ? 'model' : 'user', parts: [{ text: h.content }] });
-  });
-  contents.push({ role: 'user', parts: [{ text: userMsg }] });
-
-  try {
-    const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SYSTEM }] },
-        contents: contents,
-        generationConfig: {
-          temperature: parseFloat(document.getElementById('tSlider').value),
-          topP: parseFloat(document.getElementById('pSlider').value),
-          maxOutputTokens: 1024
-        }
-      })
+  if(!key) return '⚠️ Enter your OpenAI API key in the sidebar.';
+  const msgs=[{role:'system',content:SYSTEM}];
+  history.forEach(h=>msgs.push(h));
+  msgs.push({role:'user',content:userMsg});
+  try{
+    const resp=await fetch('https://api.openai.com/v1/chat/completions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+      body:JSON.stringify({model:'gpt-4o',messages:msgs,temperature:parseFloat(document.getElementById('tSlider').value),top_p:parseFloat(document.getElementById('pSlider').value),max_tokens:1024})
     });
-    if (!resp.ok) { const e = await resp.json().catch(() => ({})); return `❌ API Error ${resp.status}: ${e?.error?.message || resp.statusText}`; }
-    const data = await resp.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || '❌ Empty response.';
-  } catch (e) { return `❌ Network error: ${e.message}`; }
+    if(!resp.ok){const e=await resp.json().catch(()=>({}));return `❌ API Error ${resp.status}: ${e?.error?.message||resp.statusText}`;}
+    const data=await resp.json();
+    return data.choices?.[0]?.message?.content||'❌ Empty response.';
+  }catch(e){return `❌ Network error: ${e.message}`;}
 }
 
 // ── SEND ──────────────────────────────────────────
