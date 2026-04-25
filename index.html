@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ABP-ICAS · AI Financial Intelligence</title>
+<meta name="description" content="ABP-ICAS: AI-powered bill parsing, expense categorisation, and cost-splitting assistant. Powered by OpenAI GPT-4o."/>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+<style>
+/* ══════════════════════════════════════════
+   GLOBAL RESET & VARIABLES
+══════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --login-bg:    #000814;
+  --cyan:        #00f5ff;
+  --gold:        #ffd700;
+  --neon:        #0ff;
+  --red:         #ff2d55;
+  --green:       #00ff88;
+  --app-bg:      #04060f;
+  --surface:     #080d1a;
+  --card:        #0c1220;
+  --border:      #1a2540;
+  --accent:      #0ea5e9;
+  --accent2:     #38bdf8;
+  --text:        #e0f2fe;
+  --muted:       #475569;
+  --dim:         #1e3352;
+  --glow-cyan:   rgba(0,245,255,0.15);
+  --glow-gold:   rgba(255,215,0,0.12);
+}
+
+html, body { height: 100%; overflow: hidden; }
+body { font-family: 'Rajdhani', sans-serif; background: var(--login-bg); color: var(--text); cursor: none; }
+
+/* ══ CUSTOM CURSOR ══ */
+.cursor {
+  width: 16px; height: 16px;
+  border: 2px solid var(--cyan);
+  border-radius: 50%;
+  position: fixed; pointer-events: none; z-index: 9999;
+  transform: translate(-50%,-50%);
+  transition: transform 0.08s ease, background 0.15s;
+  mix-blend-mode: difference;
+}
+.cursor-dot {
+  width: 4px; height: 4px;
+  background: var(--cyan);
+  border-radius: 50%;
+  position: fixed; pointer-events: none; z-index: 9999;
+  transform: translate(-50%,-50%);
+}
+
+/* ══════════════════════════════════════════
+   3D STARFIELD CANVAS
+══════════════════════════════════════════ */
+#starCanvas {
+  position: fixed; inset: 0; z-index: 0;
+  pointer-events: none;
+}
+
+/* ══════════════════════════════════════════
+   LOGIN PAGE
+══════════════════════════════════════════ */
+#loginPage {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent;
+  perspective: 1000px;
+}
+
+/* Holographic grid floor */
+#loginPage::before {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    repeating-linear-gradient(0deg, transparent, transparent 60px, rgba(0,245,255,0.04) 60px, rgba(0,245,255,0.04) 61px),
+    repeating-linear-gradient(90deg, transparent, transparent 60px, rgba(0,245,255,0.04) 60px, rgba(0,245,255,0.04) 61px);
+  animation: gridScroll 8s linear infinite;
+  pointer-events: none;
+}
+@keyframes gridScroll { to { background-position: 0 60px, 60px 0; } }
+
+/* Radial glow centre */
+#loginPage::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse 60% 50% at 50% 50%, rgba(0,245,255,0.07) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* ── 3D CARD ── */
+.login-card-wrapper {
+  position: relative; z-index: 10;
+  transform-style: preserve-3d;
+  animation: cardFloat 6s ease-in-out infinite;
+}
+@keyframes cardFloat {
+  0%,100% { transform: rotateX(2deg) rotateY(-3deg) translateY(0px); }
+  33%      { transform: rotateX(-1deg) rotateY(4deg) translateY(-12px); }
+  66%      { transform: rotateX(3deg) rotateY(-1deg) translateY(-6px); }
+}
+
+.login-card {
+  width: 440px;
+  background: linear-gradient(145deg, rgba(8,13,26,0.95) 0%, rgba(12,18,32,0.98) 100%);
+  border: 1px solid rgba(0,245,255,0.25);
+  border-radius: 20px;
+  padding: 48px 40px 40px;
+  position: relative;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(0,245,255,0.1),
+    0 40px 80px rgba(0,0,0,0.8),
+    0 0 60px rgba(0,245,255,0.08),
+    inset 0 1px 0 rgba(0,245,255,0.15);
+  transform-style: preserve-3d;
+}
+
+/* Corner decorations */
+.login-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--cyan), var(--gold), var(--cyan), transparent);
+  animation: scanTop 3s ease-in-out infinite;
+}
+@keyframes scanTop {
+  0%,100% { opacity: 0.4; } 50% { opacity: 1; }
+}
+.login-card::after {
+  content: '';
+  position: absolute; bottom: 0; left: 0; right: 0; top: 0;
+  background: radial-gradient(ellipse 80% 40% at 50% 0%, rgba(0,245,255,0.06) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+/* Corner brackets */
+.corner { position: absolute; width: 20px; height: 20px; }
+.corner.tl { top: 12px; left: 12px; border-top: 2px solid var(--cyan); border-left: 2px solid var(--cyan); }
+.corner.tr { top: 12px; right: 12px; border-top: 2px solid var(--cyan); border-right: 2px solid var(--cyan); }
+.corner.bl { bottom: 12px; left: 12px; border-bottom: 2px solid var(--gold); border-left: 2px solid var(--gold); }
+.corner.br { bottom: 12px; right: 12px; border-bottom: 2px solid var(--gold); border-right: 2px solid var(--gold); }
+
+/* Scanline */
+.scanline {
+  position: absolute; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(0,245,255,0.4), transparent);
+  animation: scanMove 4s linear infinite;
+  pointer-events: none;
+}
+@keyframes scanMove { 0% { top: 0; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
+
+/* Login Logo */
+.login-logo {
+  text-align: center; margin-bottom: 32px;
+  position: relative; z-index: 2;
+}
+.login-logo-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 70px; height: 70px;
+  background: linear-gradient(135deg, rgba(0,245,255,0.15), rgba(0,245,255,0.05));
+  border: 1px solid rgba(0,245,255,0.3);
+  border-radius: 18px;
+  font-size: 32px; margin-bottom: 14px;
+  position: relative;
+  box-shadow: 0 0 30px rgba(0,245,255,0.2), inset 0 0 20px rgba(0,245,255,0.05);
+  animation: iconPulse 3s ease-in-out infinite;
+}
+@keyframes iconPulse {
+  0%,100% { box-shadow: 0 0 30px rgba(0,245,255,0.2), inset 0 0 20px rgba(0,245,255,0.05); }
+  50%      { box-shadow: 0 0 50px rgba(0,245,255,0.4), inset 0 0 30px rgba(0,245,255,0.1); }
+}
+.login-logo h1 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 26px; font-weight: 900;
+  letter-spacing: 4px;
+  background: linear-gradient(90deg, var(--cyan), var(--gold), var(--cyan));
+  background-size: 200% auto;
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  animation: shimmer 3s linear infinite;
+}
+@keyframes shimmer { to { background-position: 200% center; } }
+.login-logo p {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px; color: var(--muted);
+  letter-spacing: 3px; margin-top: 4px;
+  text-transform: uppercase;
+}
+
+/* Status bar */
+.status-bar {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 24px;
+  padding: 8px 12px;
+  background: rgba(0,255,136,0.05);
+  border: 1px solid rgba(0,255,136,0.15);
+  border-radius: 8px;
+  position: relative; z-index: 2;
+}
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); animation: blink 1.5s ease-in-out infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.status-text { font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--green); letter-spacing: 1px; }
+
+/* Input fields */
+.login-field { margin-bottom: 18px; position: relative; z-index: 2; }
+.login-field label {
+  display: block;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px; color: var(--cyan);
+  letter-spacing: 2px; margin-bottom: 7px;
+}
+.login-input-wrap { position: relative; }
+.login-input-icon {
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+  font-size: 16px; pointer-events: none; z-index: 1;
+}
+.login-input {
+  width: 100%;
+  background: rgba(0,245,255,0.03);
+  border: 1px solid rgba(0,245,255,0.2);
+  border-radius: 10px;
+  padding: 13px 14px 13px 44px;
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  outline: none;
+  transition: all 0.25s;
+  letter-spacing: 1px;
+}
+.login-input:focus {
+  border-color: var(--cyan);
+  background: rgba(0,245,255,0.07);
+  box-shadow: 0 0 0 3px rgba(0,245,255,0.1), 0 0 20px rgba(0,245,255,0.1);
+}
+.login-input::placeholder { color: rgba(71,85,105,0.8); font-size: 12px; }
+.pw-toggle {
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer; color: var(--muted);
+  font-size: 16px; padding: 2px;
+}
+.pw-toggle:hover { color: var(--cyan); }
+
+/* Error msg */
+.login-error {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px; color: var(--red);
+  margin-bottom: 14px; display: none;
+  padding: 8px 12px;
+  background: rgba(255,45,85,0.08);
+  border: 1px solid rgba(255,45,85,0.2);
+  border-radius: 8px;
+  position: relative; z-index: 2;
+}
+
+/* Login button */
+.login-btn {
+  width: 100%;
+  padding: 15px;
+  background: linear-gradient(135deg, rgba(0,245,255,0.15) 0%, rgba(0,245,255,0.08) 100%);
+  border: 1px solid rgba(0,245,255,0.4);
+  border-radius: 12px;
+  color: var(--cyan);
+  font-family: 'Orbitron', sans-serif;
+  font-size: 13px; font-weight: 700;
+  letter-spacing: 3px;
+  cursor: pointer;
+  position: relative; z-index: 2;
+  overflow: hidden;
+  transition: all 0.3s;
+  margin-bottom: 16px;
+}
+.login-btn::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(0,245,255,0.2), rgba(0,245,255,0.05));
+  transform: translateX(-100%);
+  transition: transform 0.4s ease;
+}
+.login-btn:hover::before { transform: translateX(0); }
+.login-btn:hover {
+  box-shadow: 0 0 30px rgba(0,245,255,0.3), inset 0 0 20px rgba(0,245,255,0.05);
+  transform: translateY(-1px);
+}
+.login-btn:active { transform: translateY(0) scale(0.99); }
+
+/* Demo hint */
+.demo-hint {
+  text-align: center;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px; color: var(--muted);
+  letter-spacing: 1px; position: relative; z-index: 2;
+}
+.demo-hint span { color: var(--gold); }
+
+/* ── ENTRY animation: card entering ── */
+.login-card-wrapper { animation: cardFloat 6s ease-in-out infinite, cardEntrance 0.8s cubic-bezier(.16,1,.3,1) both; }
+@keyframes cardEntrance {
+  from { opacity: 0; transform: rotateX(20deg) rotateY(-10deg) translateY(60px) scale(0.9); }
+  to   { opacity: 1; }
+}
+
+/* ── EXIT animation ── */
+.login-exit { animation: loginExit 0.7s cubic-bezier(.4,0,1,1) forwards !important; }
+@keyframes loginExit {
+  to { opacity: 0; transform: scale(0.8) translateZ(200px) rotateX(15deg); filter: blur(20px); }
+}
+#loginPage.fade-out { animation: pageFadeOut 0.7s ease forwards; }
+@keyframes pageFadeOut { to { opacity: 0; pointer-events: none; } }
+
+/* ══════════════════════════════════════════
+   MAIN APP
+══════════════════════════════════════════ */
+#mainApp {
+  position: fixed; inset: 0; z-index: 50;
+  display: none; flex-direction: column;
+  background: var(--app-bg);
+  opacity: 0;
+  transform: scale(1.05) translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+#mainApp.visible { opacity: 1; transform: scale(1) translateY(0); }
+
+/* Animated background mesh */
+#mainApp::before {
+  content: '';
+  position: absolute; inset: 0; z-index: 0;
+  background:
+    radial-gradient(ellipse 40% 30% at 10% 20%, rgba(14,165,233,0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 30% 40% at 90% 80%, rgba(0,245,255,0.04) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 20% at 50% 50%, rgba(255,215,0,0.02) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* ── APP HEADER ── */
+.app-header {
+  position: relative; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px; height: 58px;
+  background: rgba(4,6,15,0.95);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(20px);
+  flex-shrink: 0;
+}
+.app-logo { display: flex; align-items: center; gap: 12px; }
+.app-logo-icon {
+  width: 34px; height: 34px;
+  background: linear-gradient(135deg, rgba(0,245,255,0.2), rgba(14,165,233,0.15));
+  border: 1px solid rgba(0,245,255,0.3);
+  border-radius: 9px;
+  display: grid; place-items: center; font-size: 17px;
+  box-shadow: 0 0 20px rgba(0,245,255,0.2);
+}
+.app-logo-text { font-family: 'Orbitron', sans-serif; font-size: 15px; font-weight: 700; letter-spacing: 2px; color: var(--cyan); }
+.app-logo-sub { font-family: 'Share Tech Mono', monospace; font-size: 9px; color: var(--muted); letter-spacing: 2px; }
+.header-pills { display: flex; gap: 6px; }
+.hpill {
+  font-family: 'Share Tech Mono', monospace; font-size: 9px;
+  padding: 4px 10px; border-radius: 20px; letter-spacing: 1px;
+  background: rgba(0,245,255,0.07); border: 1px solid rgba(0,245,255,0.2); color: var(--cyan);
+}
+.hpill.gold { background: rgba(255,215,0,0.07); border-color: rgba(255,215,0,0.2); color: var(--gold); }
+.header-user {
+  display: flex; align-items: center; gap: 10px;
+}
+.user-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--cyan), var(--gold));
+  display: grid; place-items: center;
+  font-family: 'Orbitron', sans-serif; font-size: 12px; font-weight: 700;
+  color: var(--app-bg);
+}
+.logout-btn {
+  background: none; border: 1px solid rgba(255,45,85,0.3); border-radius: 6px;
+  padding: 4px 10px; color: rgba(255,45,85,0.7);
+  font-family: 'Share Tech Mono', monospace; font-size: 10px;
+  cursor: pointer; transition: all 0.2s; letter-spacing: 1px;
+}
+.logout-btn:hover { border-color: var(--red); color: var(--red); box-shadow: 0 0 10px rgba(255,45,85,0.2); }
+
+/* ── APP BODY GRID ── */
+.app-body {
+  position: relative; z-index: 1;
+  display: grid;
+  grid-template-columns: 260px 1fr 290px;
+  flex: 1; overflow: hidden;
+}
+
+/* ── LEFT SIDEBAR ── */
+.app-sidebar {
+  background: rgba(8,13,26,0.8);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+}
+.sb-section { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.sb-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px; color: var(--muted);
+  letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px;
+}
+
+/* API input */
+.api-wrap { position: relative; }
+.api-inp {
+  width: 100%;
+  background: rgba(0,245,255,0.04);
+  border: 1px solid rgba(0,245,255,0.15);
+  border-radius: 8px; padding: 9px 36px 9px 12px;
+  color: var(--text); font-family: 'Share Tech Mono', monospace;
+  font-size: 11px; outline: none; transition: all 0.2s;
+}
+.api-inp:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(0,245,255,0.08); }
+.api-eye {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer; color: var(--muted); font-size: 13px;
+}
+.api-eye:hover { color: var(--cyan); }
+
+/* Sliders */
+.param-row { margin-bottom: 10px; }
+.param-lbl { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 5px; color: var(--muted); }
+.param-lbl strong { color: var(--text); font-weight: 500; }
+.pval { font-family: 'Share Tech Mono', monospace; color: var(--cyan); font-size: 12px; }
+input[type=range] {
+  -webkit-appearance: none; width: 100%; height: 3px;
+  background: linear-gradient(90deg, var(--cyan) var(--pct,20%), var(--dim) var(--pct,20%));
+  border-radius: 3px; outline: none;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%;
+  background: var(--cyan); cursor: pointer;
+  box-shadow: 0 0 8px rgba(0,245,255,0.6);
+}
+.phint { font-size: 9px; color: var(--muted); margin-top: 3px; font-family: 'Share Tech Mono', monospace; letter-spacing: 0.5px; }
+
+/* Quick prompts */
+.qp-btn {
+  display: block; width: 100%;
+  background: rgba(14,165,233,0.04); border: 1px solid rgba(14,165,233,0.12);
+  border-radius: 7px; padding: 7px 10px;
+  color: var(--muted); font-size: 11px; font-family: 'Rajdhani', sans-serif;
+  cursor: pointer; text-align: left; margin-bottom: 5px; transition: all 0.15s; line-height: 1.3;
+}
+.qp-btn:hover { color: var(--cyan); border-color: rgba(0,245,255,0.3); background: rgba(0,245,255,0.06); }
+
+/* Stats */
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.stat-tile {
+  background: rgba(0,245,255,0.04); border: 1px solid rgba(0,245,255,0.12);
+  border-radius: 9px; padding: 10px;
+}
+.stat-v { font-family: 'Orbitron', sans-serif; font-size: 17px; font-weight: 700; color: var(--cyan); }
+.stat-l { font-size: 9px; color: var(--muted); margin-top: 2px; font-family: 'Share Tech Mono', monospace; letter-spacing: 1px; }
+
+.clear-btn-app {
+  display: block; width: calc(100% - 28px); margin: 10px 14px;
+  background: none; border: 1px solid rgba(255,45,85,0.2); border-radius: 8px;
+  padding: 8px; color: rgba(255,45,85,0.5); font-size: 11px; cursor: pointer;
+  font-family: 'Share Tech Mono', monospace; letter-spacing: 1px; transition: all 0.2s;
+}
+.clear-btn-app:hover { border-color: var(--red); color: var(--red); }
+.sidebar-spacer { flex: 1; }
+
+/* ── CHAT PANEL ── */
+.chat-panel {
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.chat-messages {
+  flex: 1; overflow-y: auto; padding: 20px;
+  display: flex; flex-direction: column; gap: 14px;
+  scroll-behavior: smooth;
+}
+.chat-messages::-webkit-scrollbar { width: 4px; }
+.chat-messages::-webkit-scrollbar-thumb { background: var(--dim); border-radius: 4px; }
+
+/* Welcome */
+.welcome-screen {
+  margin: auto; text-align: center; max-width: 400px;
+}
+.w-icon { font-size: 52px; display: block; margin-bottom: 16px; filter: drop-shadow(0 0 20px rgba(0,245,255,0.4)); animation: wIconBob 4s ease-in-out infinite; }
+@keyframes wIconBob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+.w-title { font-family: 'Orbitron', sans-serif; font-size: 20px; font-weight: 700; letter-spacing: 2px; color: var(--cyan); margin-bottom: 8px; }
+.w-sub { color: var(--muted); font-size: 13px; line-height: 1.6; font-family: 'Rajdhani', sans-serif; }
+.w-caps { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 14px; }
+.w-cap {
+  font-size: 9px; font-family: 'Share Tech Mono', monospace;
+  padding: 4px 10px; border-radius: 20px;
+  border: 1px solid var(--border); color: var(--muted); letter-spacing: 1px;
+}
+.w-cap.on { border-color: rgba(0,245,255,0.35); color: var(--cyan); background: rgba(0,245,255,0.06); }
+
+/* Messages */
+.msg { display: flex; gap: 10px; align-items: flex-start; animation: msgIn 0.3s cubic-bezier(.16,1,.3,1); }
+@keyframes msgIn { from { opacity: 0; transform: translateY(12px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.msg.user { flex-direction: row-reverse; }
+.msg-av {
+  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+  display: grid; place-items: center; font-size: 14px;
+}
+.msg.user .msg-av { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+.msg.bot  .msg-av { background: linear-gradient(135deg, rgba(0,245,255,0.25), rgba(14,165,233,0.2)); border: 1px solid rgba(0,245,255,0.3); box-shadow: 0 0 12px rgba(0,245,255,0.2); }
+.msg-body { max-width: 80%; }
+.msg-bubble {
+  padding: 11px 15px; border-radius: 14px; line-height: 1.6; font-size: 13px;
+}
+.msg.user .msg-bubble {
+  background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.15));
+  border: 1px solid rgba(139,92,246,0.3); border-top-right-radius: 4px;
+  color: var(--text);
+}
+.msg.bot .msg-bubble {
+  background: rgba(12,18,32,0.9); border: 1px solid var(--border);
+  border-top-left-radius: 4px; color: var(--text);
+}
+.msg-time { font-size: 9px; color: var(--muted); margin-top: 3px; font-family: 'Share Tech Mono', monospace; letter-spacing: 0.5px; }
+.msg.user .msg-time { text-align: right; }
+
+/* JSON card */
+.json-card {
+  background: rgba(4,6,15,0.95); border: 1px solid rgba(0,245,255,0.2);
+  border-left: 3px solid var(--cyan); border-radius: 0 10px 10px 0;
+  padding: 12px; margin-top: 10px; font-family: 'Share Tech Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+}
+.jc-hdr { font-size: 9px; letter-spacing: 2px; color: var(--muted); margin-bottom: 7px; }
+.jrow { display: flex; gap: 6px; }
+.jkey { color: var(--cyan); }
+.jval { color: #4ade80; }
+.jval.s { color: #fb923c; }
+
+/* Typing */
+.typing-indicator {
+  display: inline-flex; gap: 4px; align-items: center;
+  padding: 11px 15px; background: rgba(12,18,32,0.9);
+  border: 1px solid var(--border); border-radius: 14px; border-top-left-radius: 4px;
+}
+.typing-indicator span {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--cyan); opacity: 0.3;
+  animation: typePulse 1.2s infinite;
+}
+.typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+.typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typePulse { 0%,80%,100%{opacity:0.2} 40%{opacity:1} }
+
+/* Chat input */
+.chat-input-bar {
+  padding: 12px 16px; border-top: 1px solid var(--border);
+  background: rgba(4,6,15,0.9); display: flex; gap: 8px; align-items: flex-end;
+  backdrop-filter: blur(10px);
+}
+.chat-ta {
+  flex: 1; background: rgba(0,245,255,0.04); border: 1px solid rgba(0,245,255,0.15);
+  border-radius: 11px; padding: 11px 14px; color: var(--text);
+  font-family: 'Rajdhani', sans-serif; font-size: 14px; resize: none;
+  outline: none; max-height: 120px; min-height: 42px; line-height: 1.4;
+  transition: all 0.2s; overflow-y: auto;
+}
+.chat-ta:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(0,245,255,0.08); }
+.chat-ta::placeholder { color: var(--muted); font-size: 13px; }
+.send-btn {
+  width: 42px; height: 42px; flex-shrink: 0;
+  background: linear-gradient(135deg, rgba(0,245,255,0.2), rgba(14,165,233,0.15));
+  border: 1px solid rgba(0,245,255,0.4); border-radius: 11px;
+  cursor: pointer; color: var(--cyan); font-size: 17px;
+  display: grid; place-items: center; transition: all 0.15s;
+  box-shadow: 0 0 15px rgba(0,245,255,0.15);
+}
+.send-btn:hover { box-shadow: 0 0 25px rgba(0,245,255,0.35); transform: scale(1.05); }
+.send-btn:disabled { opacity: 0.3; pointer-events: none; }
+
+/* ── RIGHT PANEL ── */
+.right-panel {
+  background: rgba(8,13,26,0.8); border-left: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden; backdrop-filter: blur(10px);
+}
+.rtabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.rtab {
+  flex: 1; padding: 12px 4px; background: none; border: none;
+  color: var(--muted); cursor: pointer; font-size: 10px;
+  font-family: 'Share Tech Mono', monospace; letter-spacing: 1px;
+  border-bottom: 2px solid transparent; transition: all 0.15s;
+  text-transform: uppercase;
+}
+.rtab.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+.rpanel { flex: 1; overflow-y: auto; padding: 14px; }
+.rpanel::-webkit-scrollbar { width: 3px; }
+.rpanel::-webkit-scrollbar-thumb { background: var(--dim); }
+
+/* Bill card */
+.bill-card {
+  background: rgba(12,18,32,0.9); border: 1px solid var(--border);
+  border-radius: 11px; padding: 12px; margin-bottom: 8px;
+  animation: msgIn 0.2s ease;
+  transition: border-color 0.2s;
+}
+.bill-card:hover { border-color: rgba(0,245,255,0.25); }
+.bc-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 7px; }
+.bc-vendor { font-weight: 600; font-size: 12px; color: var(--text); font-family: 'Rajdhani', sans-serif; }
+.bc-amt { font-family: 'Orbitron', monospace; font-size: 13px; color: var(--green); }
+.bc-tags { display: flex; gap: 5px; flex-wrap: wrap; }
+.bctag {
+  font-size: 9px; font-family: 'Share Tech Mono', monospace;
+  padding: 2px 8px; border-radius: 20px; letter-spacing: 0.5px;
+}
+.bctag.cat { background: rgba(0,245,255,0.08); color: var(--cyan); border: 1px solid rgba(0,245,255,0.2); }
+.bctag.date { background: rgba(0,255,136,0.06); color: var(--green); border: 1px solid rgba(0,255,136,0.2); }
+
+/* Cat bars */
+.cr { margin-bottom: 11px; }
+.cr-lbl { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px; font-family: 'Rajdhani', sans-serif; }
+.cr-bar-bg { height: 4px; background: var(--dim); border-radius: 4px; overflow: hidden; }
+.cr-bar { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--cyan), var(--accent2)); transition: width 0.8s cubic-bezier(.16,1,.3,1); }
+
+/* About table */
+.about-t { width: 100%; border-collapse: collapse; }
+.about-t td { padding: 7px 8px; font-size: 11px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.about-t td:first-child { color: var(--muted); font-family: 'Share Tech Mono', monospace; font-size: 9px; width: 42%; letter-spacing: 1px; }
+.about-t td:last-child { color: var(--text); font-family: 'Rajdhani', sans-serif; font-weight: 500; }
+.about-sec { font-family: 'Orbitron', sans-serif; font-size: 10px; font-weight: 700; color: var(--cyan); margin: 14px 0 7px; letter-spacing: 2px; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 24px; right: 24px;
+  background: rgba(255,45,85,0.12); border: 1px solid rgba(255,45,85,0.35);
+  color: var(--red); padding: 10px 16px; border-radius: 9px;
+  font-family: 'Share Tech Mono', monospace; font-size: 11px; z-index: 999;
+  animation: msgIn 0.2s ease; max-width: 300px; display: none; letter-spacing: 0.5px;
+}
+
+/* scrollbars */
+.chat-messages, .rpanel, .app-sidebar { scrollbar-width: thin; scrollbar-color: var(--dim) transparent; }
+
+/* Responsive */
+@media (max-width: 900px) {
+  .app-body { grid-template-columns: 0 1fr 0; }
+  .app-sidebar, .right-panel { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- CURSOR -->
+<div class="cursor" id="cursor"></div>
+<div class="cursor-dot" id="cursorDot"></div>
+
+<!-- STAR CANVAS -->
+<canvas id="starCanvas"></canvas>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- ════════════════════════════════════
+     LOGIN PAGE
+════════════════════════════════════ -->
+<div id="loginPage">
+  <div class="login-card-wrapper" id="loginCardWrapper">
+    <div class="login-card">
+      <div class="corner tl"></div><div class="corner tr"></div>
+      <div class="corner bl"></div><div class="corner br"></div>
+      <div class="scanline"></div>
+
+      <div class="login-logo">
+        <div class="login-logo-icon">💳</div>
+        <h1>ABP-ICAS</h1>
+        <p>AI Financial Intelligence System</p>
+      </div>
+
+      <div class="status-bar">
+        <div class="status-dot"></div>
+        <div class="status-text">SYSTEM ONLINE · OPENAI API READY</div>
+      </div>
+
+      <div class="login-field">
+        <label>USER IDENTIFIER</label>
+        <div class="login-input-wrap">
+          <span class="login-input-icon">👤</span>
+          <input class="login-input" type="text" id="loginUser" placeholder="Enter username" autocomplete="off"/>
+        </div>
+      </div>
+
+      <div class="login-field">
+        <label>ACCESS CODE</label>
+        <div class="login-input-wrap">
+          <span class="login-input-icon">🔒</span>
+          <input class="login-input" type="password" id="loginPass" placeholder="Enter password" autocomplete="off" onkeydown="if(event.key==='Enter')doLogin()"/>
+          <button class="pw-toggle" onclick="togglePw()" id="pwToggle">👁</button>
+        </div>
+      </div>
+
+      <div class="login-error" id="loginError">⚠ INVALID CREDENTIALS — ACCESS DENIED</div>
+
+      <button class="login-btn" onclick="doLogin()" id="loginBtn">
+        ⬡ INITIALIZE SESSION
+      </button>
+
+      <div class="demo-hint">
+        Demo credentials &nbsp;→&nbsp; <span>admin</span> / <span>1234</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════
+     MAIN APP
+════════════════════════════════════ -->
+<div id="mainApp">
+  <!-- HEADER -->
+  <div class="app-header">
+    <div class="app-logo">
+      <div class="app-logo-icon">💳</div>
+      <div>
+        <div class="app-logo-text">ABP-ICAS</div>
+        <div class="app-logo-sub">AI BILL PARSING · COST ALLOCATION</div>
+      </div>
+    </div>
+    <div class="header-pills">
+      <span class="hpill">GPT-4o</span>
+      <span class="hpill">FINANCE DOMAIN</span>
+      <span class="hpill gold" id="hBillCount">0 BILLS</span>
+    </div>
+    <div class="header-user">
+      <div class="user-avatar" id="userAvatar">A</div>
+      <button class="logout-btn" onclick="doLogout()">⏏ LOGOUT</button>
+    </div>
+  </div>
+
+  <!-- BODY -->
+  <div class="app-body">
+
+    <!-- LEFT SIDEBAR -->
+    <div class="app-sidebar">
+      <div class="sb-section">
+        <div class="sb-label">OpenAI API Key</div>
+        <div class="api-wrap">
+          <input class="api-inp" type="password" id="apiKey" placeholder="sk-..." autocomplete="off"/>
+          <button class="api-eye" onclick="toggleApiKey()" id="apiEye">👁</button>
+        </div>
+      </div>
+
+      <div class="sb-section">
+        <div class="sb-label">Model Parameters</div>
+        <div class="param-row">
+          <div class="param-lbl"><strong>🌡 Temperature</strong><span class="pval" id="tVal">0.20</span></div>
+          <input type="range" id="tSlider" min="0" max="1" step="0.05" value="0.2"
+            oninput="document.getElementById('tVal').textContent=parseFloat(this.value).toFixed(2);updateTHint();updateSliderBg(this)"/>
+          <div class="phint" id="tHint">✅ ACCURATE · IDEAL FOR FINANCE</div>
+        </div>
+        <div class="param-row">
+          <div class="param-lbl"><strong>🎯 Top-p</strong><span class="pval" id="pVal">0.95</span></div>
+          <input type="range" id="pSlider" min="0.1" max="1" step="0.05" value="0.95"
+            oninput="document.getElementById('pVal').textContent=parseFloat(this.value).toFixed(2);updateSliderBg(this)"/>
+          <div class="phint">NUCLEUS SAMPLING · BROAD TOKEN POOL</div>
+        </div>
+      </div>
+
+      <div class="sb-section" style="flex:1;overflow-y:auto;">
+        <div class="sb-label">Quick Prompts</div>
+        <button class="qp-btn" onclick="fill(this.textContent)">Parse: Zomato ₹650 on 12 Feb 2025, Burger &amp; Fries</button>
+        <button class="qp-btn" onclick="fill(this.textContent)">Parse: Apollo Pharmacy ₹1200 on 15 Mar 2025, medicines</button>
+        <button class="qp-btn" onclick="fill(this.textContent)">Split ₹4800 restaurant bill among 4 friends equally</button>
+        <button class="qp-btn" onclick="fill(this.textContent)">Parse: Jio recharge ₹299 on 1 Apr 2025</button>
+        <button class="qp-btn" onclick="fill(this.textContent)">How can I reduce my monthly food expenses?</button>
+        <button class="qp-btn" onclick="fill(this.textContent)">Split ₹9000 trip: Aman 40%, Priya 35%, Rahul 25%</button>
+      </div>
+
+      <div class="sb-section">
+        <div class="sb-label">Session Stats</div>
+        <div class="stat-grid">
+          <div class="stat-tile"><div class="stat-v" id="sBills">0</div><div class="stat-l">BILLS</div></div>
+          <div class="stat-tile"><div class="stat-v" id="sTotal">₹0</div><div class="stat-l">SPEND</div></div>
+        </div>
+      </div>
+
+      <div class="sidebar-spacer"></div>
+      <button class="clear-btn-app" onclick="clearSession()">⟳ CLEAR SESSION</button>
+    </div>
+
+    <!-- CHAT PANEL -->
+    <div class="chat-panel">
+      <div class="chat-messages" id="chatMsgs">
+        <div class="welcome-screen" id="welcome">
+          <span class="w-icon">💳</span>
+          <div class="w-title">ABP-ICAS ONLINE</div>
+          <div class="w-sub">Paste any bill, ask to split costs, or ask a finance question.<br>Domain-restricted to Finance only.</div>
+          <div class="w-caps">
+            <span class="w-cap on">📄 BILL PARSING</span>
+            <span class="w-cap on">🏷 CATEGORISE</span>
+            <span class="w-cap on">➗ SPLIT COSTS</span>
+            <span class="w-cap on">💬 FINANCE Q&A</span>
+            <span class="w-cap">OFF-DOMAIN: REFUSED</span>
+          </div>
+        </div>
+      </div>
+      <div class="chat-input-bar">
+        <textarea class="chat-ta" id="chatIn" rows="1"
+          placeholder="Paste a bill or ask a finance question… (Enter to send)"
+          oninput="autoR(this)" onkeydown="handleKey(event)"></textarea>
+        <button class="send-btn" id="sendBtn" onclick="send()" title="Send">➤</button>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="right-panel">
+      <div class="rtabs">
+        <button class="rtab active" onclick="switchTab('bills',this)">BILLS</button>
+        <button class="rtab" onclick="switchTab('cats',this)">CATS</button>
+        <button class="rtab" onclick="switchTab('about',this)">ABOUT</button>
+      </div>
+      <div class="rpanel" id="tabBills">
+        <div style="color:var(--muted);font-family:'Share Tech Mono',monospace;font-size:10px;text-align:center;margin-top:40px;letter-spacing:1px;">NO BILLS PARSED YET</div>
+      </div>
+      <div class="rpanel" id="tabCats" style="display:none"></div>
+      <div class="rpanel" id="tabAbout" style="display:none">
+        <div class="about-sec">PROJECT INFO</div>
+        <table class="about-t">
+          <tr><td>CHATBOT TYPE</td><td>Generative AI (LLM)</td></tr>
+          <tr><td>PLATFORM</td><td>Standalone HTML</td></tr>
+          <tr><td>API</td><td>OpenAI</td></tr>
+          <tr><td>MODEL</td><td>GPT-4o (latest)</td></tr>
+          <tr><td>MEMORY</td><td>Session-based</td></tr>
+          <tr><td>DOMAIN</td><td>Finance / Expenses</td></tr>
+          <tr><td>ROLE</td><td>Domain Expert AI</td></tr>
+          <tr><td>AUTH</td><td>Login-protected</td></tr>
+        </table>
+        <div class="about-sec">MODEL CONFIG</div>
+        <table class="about-t">
+          <tr><td>TEMPERATURE</td><td>0.20 (low = accurate)</td></tr>
+          <tr><td>TOP-P</td><td>0.95 (broad sampling)</td></tr>
+          <tr><td>MAX TOKENS</td><td>1024</td></tr>
+          <tr><td>ENDPOINT</td><td>/v1/chat/completions</td></tr>
+        </table>
+        <div class="about-sec">CATEGORIES</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;">
+          <span class="bctag cat">Food</span><span class="bctag cat">Travel</span>
+          <span class="bctag cat">Utilities</span><span class="bctag cat">Healthcare</span>
+          <span class="bctag cat">Entertainment</span><span class="bctag cat">Shopping</span>
+          <span class="bctag cat">Rent</span><span class="bctag cat">Salary</span>
+          <span class="bctag cat">Misc</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════ -->
+<script>
+// ── CURSOR ──────────────────────────────────────
+const cursor = document.getElementById('cursor');
+const cursorDot = document.getElementById('cursorDot');
+let mx=0, my=0, curX=0, curY=0;
+document.addEventListener('mousemove', e => { mx=e.clientX; my=e.clientY; cursorDot.style.left=mx+'px'; cursorDot.style.top=my+'px'; });
+(function moveCursor(){
+  curX += (mx-curX)*0.15; curY += (my-curY)*0.15;
+  cursor.style.left=curX+'px'; cursor.style.top=curY+'px';
+  requestAnimationFrame(moveCursor);
+})();
+
+// ── 3D STAR FIELD ────────────────────────────────
+const canvas = document.getElementById('starCanvas');
+const ctx = canvas.getContext('2d');
+let W, H, stars=[];
+function initStars(){
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  stars = Array.from({length:200}, () => ({
+    x: Math.random()*W - W/2,
+    y: Math.random()*H - H/2,
+    z: Math.random()*W,
+    pz: 0
+  }));
+}
+function drawStars(){
+  ctx.fillStyle = 'rgba(0,8,20,0.25)';
+  ctx.fillRect(0,0,W,H);
+  const cx2=W/2, cy2=H/2;
+  stars.forEach(s => {
+    s.pz = s.z;
+    s.z -= 2.5;
+    if(s.z<=0){ s.z=W; s.x=Math.random()*W-W/2; s.y=Math.random()*H-H/2; }
+    const sx = (s.x/s.z)*W + cx2, sy = (s.y/s.z)*H + cy2;
+    const px = (s.x/s.pz)*W + cx2, py = (s.y/s.pz)*H + cy2;
+    const size = Math.max(0.5, (1-s.z/W)*3);
+    const bright = Math.min(1,(1-s.z/W)*1.5);
+    const g = ctx.createLinearGradient(px,py,sx,sy);
+    g.addColorStop(0,'rgba(0,245,255,0)');
+    g.addColorStop(1,`rgba(0,245,255,${bright*0.8})`);
+    ctx.beginPath(); ctx.strokeStyle=g; ctx.lineWidth=size;
+    ctx.moveTo(px,py); ctx.lineTo(sx,sy); ctx.stroke();
+  });
+  requestAnimationFrame(drawStars);
+}
+window.addEventListener('resize', initStars);
+initStars(); drawStars();
+
+// ── 3D CARD MOUSE TILT ───────────────────────────
+const wrapper = document.getElementById('loginCardWrapper');
+if(wrapper){
+  document.addEventListener('mousemove', e => {
+    const rx = ((e.clientY/window.innerHeight)-0.5)*18;
+    const ry = ((e.clientX/window.innerWidth)-0.5)*-18;
+    wrapper.style.animation = 'none';
+    wrapper.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg) translateY(${-rx*0.5}px)`;
+  });
+}
+
+// ── TOGGLE PW ────────────────────────────────────
+function togglePw(){
+  const i = document.getElementById('loginPass');
+  i.type = i.type==='password' ? 'text' : 'password';
+}
+
+// ── LOGIN ─────────────────────────────────────────
+function doLogin(){
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value.trim();
+  const err = document.getElementById('loginError');
+  const btn = document.getElementById('loginBtn');
+
+  btn.textContent = '⬡ VERIFYING...';
+  btn.style.opacity = '0.7';
+
+  setTimeout(() => {
+    if(u==='admin' && p==='1234'){
+      err.style.display='none';
+      // Set user avatar
+      document.getElementById('userAvatar').textContent = u[0].toUpperCase();
+
+      // Animate out login
+      document.getElementById('loginCardWrapper').classList.add('login-exit');
+      document.getElementById('loginPage').classList.add('fade-out');
+
+      // Show main app after delay
+      setTimeout(() => {
+        document.getElementById('loginPage').style.display='none';
+        const app = document.getElementById('mainApp');
+        app.style.display='flex';
+        setTimeout(()=>app.classList.add('visible'), 30);
+      }, 700);
+    } else {
+      err.style.display='block';
+      btn.textContent='⬡ INITIALIZE SESSION';
+      btn.style.opacity='1';
+      // Shake card
+      const card = document.querySelector('.login-card');
+      card.style.animation='shake 0.4s ease';
+      setTimeout(()=>card.style.animation='',400);
+    }
+  }, 800);
+}
+
+// Shake animation
+const shakeStyle = document.createElement('style');
+shakeStyle.textContent = '@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}';
+document.head.appendChild(shakeStyle);
+
+// ── LOGOUT ────────────────────────────────────────
+function doLogout(){
+  const app = document.getElementById('mainApp');
+  app.classList.remove('visible');
+  setTimeout(() => {
+    app.style.display='none';
+    document.getElementById('loginPage').style.display='flex';
+    document.getElementById('loginPage').classList.remove('fade-out');
+    document.getElementById('loginCardWrapper').classList.remove('login-exit');
+    document.getElementById('loginCardWrapper').style.animation='';
+    document.getElementById('loginUser').value='';
+    document.getElementById('loginPass').value='';
+    document.getElementById('loginBtn').textContent='⬡ INITIALIZE SESSION';
+    clearSession();
+  },500);
+}
+
+// ── SLIDER FILL ───────────────────────────────────
+function updateSliderBg(el){
+  const min=parseFloat(el.min), max=parseFloat(el.max), val=parseFloat(el.value);
+  const pct = ((val-min)/(max-min))*100;
+  el.style.setProperty('--pct', pct+'%');
+}
+document.querySelectorAll('input[type=range]').forEach(el=>{updateSliderBg(el);});
+
+function updateTHint(){
+  const t=parseFloat(document.getElementById('tSlider').value);
+  const h=document.getElementById('tHint');
+  if(t<=0.3) h.textContent='✅ ACCURATE · IDEAL FOR FINANCE';
+  else if(t<=0.6) h.textContent='⚡ BALANCED MODE';
+  else h.textContent='⚠ CREATIVE · LESS ACCURATE';
+}
+
+// ── API KEY TOGGLE ────────────────────────────────
+function toggleApiKey(){
+  const i=document.getElementById('apiKey');
+  i.type = i.type==='password' ? 'text' : 'password';
+}
+
+// ── QUICK FILL ────────────────────────────────────
+function fill(t){
+  const ta=document.getElementById('chatIn');
+  ta.value=t; autoR(ta); ta.focus();
+}
+
+// ── AUTO RESIZE ───────────────────────────────────
+function autoR(el){
+  el.style.height='auto';
+  el.style.height=Math.min(el.scrollHeight,120)+'px';
+}
+
+// ── HANDLE KEY ────────────────────────────────────
+function handleKey(e){
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}
+}
+
+// ── TABS ──────────────────────────────────────────
+function switchTab(name,btn){
+  ['Bills','Cats','About'].forEach(t=>{
+    document.getElementById('tab'+t).style.display=t.toLowerCase()===name?'block':'none';
+  });
+  document.querySelectorAll('.rtab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if(name==='cats') renderCats();
+}
+
+// ── STATE ─────────────────────────────────────────
+let chatHistory=[], bills=[], totalExp=0, catTotals={}, sending=false;
+
+const CATS_KW={
+  Food:          ['restaurant','cafe','pizza','food','meal','grocery','swiggy','zomato','lunch','dinner','breakfast'],
+  Travel:        ['uber','ola','flight','train','bus','hotel','fuel','petrol','toll','cab','taxi','irctc'],
+  Utilities:     ['electricity','water','gas','internet','broadband','mobile','recharge','wifi','jio','airtel'],
+  Healthcare:    ['hospital','pharmacy','medicine','doctor','clinic','lab','dental','apollo'],
+  Entertainment: ['netflix','amazon prime','movie','concert','spotify','gaming','subscription','hotstar'],
+  Shopping:      ['amazon','flipkart','myntra','clothing','shoes','electronics','purchase'],
+  Rent:          ['rent','lease','apartment','pg','hostel','accommodation'],
+  Salary:        ['salary','payroll','wages','income','bonus'],
+};
+
+const SYSTEM=`You are ABP-ICAS, an expert AI Financial Assistant.
+Permitted tasks ONLY:
+1. BILL PARSING — output JSON first, always:
+\`\`\`json
+{"vendor":"...","date":"YYYY-MM-DD","total_amount":0.00,"currency":"INR","items":[{"description":"...","amount":0.00}],"category":"..."}
+\`\`\`
+Then a plain-English summary.
+2. EXPENSE CATEGORISATION — one of: Food, Travel, Utilities, Healthcare, Entertainment, Shopping, Rent, Salary, Miscellaneous
+3. COST SPLITTING — list each person's exact share.
+4. FINANCE Q&A — budgeting, savings, expense management.
+RULE: Refuse ALL off-domain questions politely. Never fabricate financial figures.`;
+
+function localCat(t){
+  t=t.toLowerCase();
+  for(const[c,kws] of Object.entries(CATS_KW)) if(kws.some(k=>t.includes(k))) return c;
+  return 'Miscellaneous';
+}
+
+function extractJSON(t){
+  const m=t.match(/```json\s*([\s\S]*?)\s*```/);
+  if(m){try{return JSON.parse(m[1]);}catch(e){}}
+  return null;
+}
+
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function tNow(){return new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
+
+// ── FORMAT RESPONSE ───────────────────────────────
+function formatResp(text, bill){
+  let c = text.replace(/```json[\s\S]*?```/g,'').trim();
+  c = c.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
+  c = c.replace(/^\d+\.\s(.+)$/gm,'<div style="padding-left:10px;margin:2px 0">• $1</div>');
+  c = c.split('\n\n').map(p=>`<p style="margin:3px 0">${p.replace(/\n/g,'<br>')}</p>`).join('');
+
+  let jh='';
+  if(bill){
+    jh=`<div class="json-card">
+      <div class="jc-hdr">📄 EXTRACTED BILL DATA</div>
+      ${bill.vendor?`<div class="jrow"><span class="jkey">vendor&nbsp;&nbsp;</span><span class="jval s">"${esc(bill.vendor)}"</span></div>`:''}
+      ${bill.date?`<div class="jrow"><span class="jkey">date&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="jval s">"${esc(bill.date)}"</span></div>`:''}
+      <div class="jrow"><span class="jkey">amount&nbsp;&nbsp;</span><span class="jval">₹${Number(bill.total_amount||0).toLocaleString('en-IN',{minimumFractionDigits:2})}</span></div>
+      <div class="jrow"><span class="jkey">category</span><span class="jval s">"${esc(bill.category||'—')}"</span></div>
+      ${(bill.items||[]).length?`<div style="margin-top:5px;color:var(--muted);font-size:10px;">${bill.items.map(i=>`• ${esc(i.description||'')} ₹${Number(i.amount||0).toLocaleString('en-IN')}`).join('<br>')}</div>`:''}
+    </div>`;
+  }
+  return jh+c;
+}
+
+// ── ADD MESSAGE ───────────────────────────────────
+function addMsg(role, content, bill){
+  const w=document.getElementById('welcome');
+  if(w) w.remove();
+  const container=document.getElementById('chatMsgs');
+  const d=document.createElement('div');
+  d.className=`msg ${role}`;
+  const av = role==='user'?'👤':'🤖';
+  const bubble = role==='bot' ? formatResp(content,bill) : `<p>${esc(content).replace(/\n/g,'<br>')}</p>`;
+  d.innerHTML=`
+    <div class="msg-av">${av}</div>
+    <div class="msg-body">
+      <div class="msg-bubble">${bubble}</div>
+      <div class="msg-time">${tNow()}</div>
+    </div>`;
+  container.appendChild(d);
+  setTimeout(()=>container.scrollTop=container.scrollHeight,50);
+}
+
+// ── TYPING ────────────────────────────────────────
+function showTyping(){
+  const container=document.getElementById('chatMsgs');
+  const d=document.createElement('div');
+  d.className='msg bot'; d.id='typing';
+  d.innerHTML=`<div class="msg-av">🤖</div><div class="msg-body"><div class="typing-indicator"><span></span><span></span><span></span></div></div>`;
+  container.appendChild(d);
+  setTimeout(()=>container.scrollTop=container.scrollHeight,50);
+}
+function removeTyping(){const t=document.getElementById('typing');if(t)t.remove();}
+
+// ── TOAST ─────────────────────────────────────────
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.style.display='block';
+  setTimeout(()=>t.style.display='none',3500);
+}
+
+// ── API CALL ──────────────────────────────────────
+async function callAPI(userMsg){
+  const key=document.getElementById('apiKey').value.trim();
+  if(!key) return '⚠️ Enter your OpenAI API key in the sidebar.';
+  const msgs=[{role:'system',content:SYSTEM}];
+  chatHistory.forEach(h=>msgs.push(h));
+  msgs.push({role:'user',content:userMsg});
+  try{
+    const resp=await fetch('https://api.openai.com/v1/chat/completions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+      body:JSON.stringify({model:'gpt-4o',messages:msgs,temperature:parseFloat(document.getElementById('tSlider').value),top_p:parseFloat(document.getElementById('pSlider').value),max_tokens:1024})
+    });
+    if(!resp.ok){const e=await resp.json().catch(()=>({}));return `❌ API Error ${resp.status}: ${e?.error?.message||resp.statusText}`;}
+    const data=await resp.json();
+    return data.choices?.[0]?.message?.content||'❌ Empty response.';
+  }catch(e){return `❌ Network error: ${e.message}`;}
+}
+
+// ── SEND ──────────────────────────────────────────
+async function send(){
+  if(sending) return;
+  const ta=document.getElementById('chatIn');
+  const text=ta.value.trim();
+  if(!text) return;
+  ta.value=''; autoR(ta);
+  sending=true; document.getElementById('sendBtn').disabled=true;
+  addMsg('user',text);
+  chatHistory.push({role:'user',content:text});
+  showTyping();
+  const reply=await callAPI(text);
+  removeTyping();
+  let bill=extractJSON(reply);
+  if(bill&&!bill.category) bill.category=localCat(text);
+  if(bill&&Number(bill.total_amount)>0){
+    if(!bill.category)bill.category=localCat(text);
+    bills.push(bill);
+    const amt=Number(bill.total_amount||0);
+    totalExp+=amt;
+    const cat=bill.category||'Miscellaneous';
+    catTotals[cat]=(catTotals[cat]||0)+amt;
+    updateStats(); renderBills();
+  }
+  addMsg('bot',reply,bill);
+  chatHistory.push({role:'assistant',content:reply});
+  sending=false; document.getElementById('sendBtn').disabled=false;
+  document.getElementById('chatIn').focus();
+}
+
+// ── STATS ─────────────────────────────────────────
+function updateStats(){
+  document.getElementById('sBills').textContent=bills.length;
+  document.getElementById('sTotal').textContent='₹'+totalExp.toLocaleString('en-IN',{minimumFractionDigits:0,maximumFractionDigits:0});
+  document.getElementById('hBillCount').textContent=bills.length+' BILLS';
+}
+
+// ── RENDER BILLS ──────────────────────────────────
+function renderBills(){
+  const el=document.getElementById('tabBills');
+  if(!bills.length){
+    el.innerHTML='<div style="color:var(--muted);font-family:\'Share Tech Mono\',monospace;font-size:10px;text-align:center;margin-top:40px;letter-spacing:1px;">NO BILLS PARSED YET</div>';
+    return;
+  }
+  el.innerHTML=bills.slice().reverse().map(b=>`
+    <div class="bill-card">
+      <div class="bc-top">
+        <div class="bc-vendor">${esc(b.vendor||'Unknown')}</div>
+        <div class="bc-amt">₹${Number(b.total_amount||0).toLocaleString('en-IN',{minimumFractionDigits:2})}</div>
+      </div>
+      <div class="bc-tags">
+        <span class="bctag cat">${esc(b.category||'—')}</span>
+        ${b.date?`<span class="bctag date">${esc(b.date)}</span>`:''}
+      </div>
+      ${(b.items||[]).length?`<div style="margin-top:5px;font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace;">${b.items.map(i=>`${esc(i.description||'')} · ₹${Number(i.amount||0).toLocaleString('en-IN')}`).join('  ')}</div>`:''}
+    </div>`).join('');
+}
+
+// ── RENDER CATS ───────────────────────────────────
+function renderCats(){
+  const el=document.getElementById('tabCats');
+  if(!totalExp){el.innerHTML='<div style="color:var(--muted);font-family:\'Share Tech Mono\',monospace;font-size:10px;text-align:center;margin-top:40px;letter-spacing:1px;">NO DATA YET</div>';return;}
+  const sorted=Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
+  el.innerHTML=`
+    <div style="margin-bottom:16px;">
+      <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:2px;margin-bottom:4px;">TOTAL SPEND</div>
+      <div style="font-family:'Orbitron',sans-serif;font-size:22px;font-weight:700;color:var(--green);">₹${totalExp.toLocaleString('en-IN',{minimumFractionDigits:2})}</div>
+    </div>
+    ${sorted.map(([cat,val])=>{
+      const pct=Math.round(val/totalExp*100);
+      return `<div class="cr">
+        <div class="cr-lbl"><span>${esc(cat)}</span><span style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);">₹${val.toLocaleString('en-IN')} · ${pct}%</span></div>
+        <div class="cr-bar-bg"><div class="cr-bar" style="width:${pct}%"></div></div>
+      </div>`;
+    }).join('')}`;
+}
+
+// ── CLEAR ─────────────────────────────────────────
+function clearSession(){
+  chatHistory=[]; bills=[]; totalExp=0; catTotals={};
+  updateStats(); renderBills();
+  document.getElementById('chatMsgs').innerHTML=`
+    <div class="welcome-screen" id="welcome">
+      <span class="w-icon">💳</span>
+      <div class="w-title">ABP-ICAS ONLINE</div>
+      <div class="w-sub">Paste any bill, ask to split costs, or ask a finance question.<br>Domain-restricted to Finance only.</div>
+      <div class="w-caps">
+        <span class="w-cap on">📄 BILL PARSING</span>
+        <span class="w-cap on">🏷 CATEGORISE</span>
+        <span class="w-cap on">➗ SPLIT COSTS</span>
+        <span class="w-cap on">💬 FINANCE Q&amp;A</span>
+        <span class="w-cap">OFF-DOMAIN: REFUSED</span>
+      </div>
+    </div>`;
+}
+</script>
+</body>
+</html>
